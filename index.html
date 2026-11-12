@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SGSI LAB | Auditoría individual</title>
+    <link rel="stylesheet" href="./styles_sgsi_lab.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <div class="header-brand">
+          <div class="logo-container">
+            <img
+              src="./logo.png"
+              alt="SGSI LAB Security by AmyHean"
+              class="brand-logo"
+            />
+          </div>
+
+          <div class="header-copy">
+            <h1>SGSI LAB</h1>
+            <p>
+              Laboratorio individual de auditoría interna · ISO/IEC 27001:2022 ·
+              Simulación educativa
+            </p>
+          </div>
+        </div>
+
+        <span class="header-chip">AUDITORÍA INTERACTIVA</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="layout">
+        <aside class="nav" id="nav">
+          <button data-page="inicio" class="active">Inicio</button>
+          <button data-page="caso">Caso y documentos</button>
+          <button data-page="analisis">Riesgo y vulnerabilidad</button>
+          <button data-page="riesgos">Registro de riesgos</button>
+          <button data-page="evidencias">Evidencias</button>
+          <button data-page="hallazgos">Hallazgos</button>
+          <button data-page="evaluacion">Autoevaluación</button>
+          <button data-page="informe">Informe final</button>
+        </aside>
+        <section class="panel">
+          <div id="workspace"></div>
+          <div id="printReport"></div>
+        </section>
+      </div>
+    </main>
+    <script>
+      const KEY = "sgsilab-v2";
+      const base = () => ({
+        auditor: "",
+        fecha: new Date().toLocaleDateString("en-CA"),
+        riesgos: [],
+        evidencias: [],
+        hallazgos: [],
+        conclusion: "",
+        answers: {},
+        graded: false,
+      });
+      let state;
+      try {
+        state = { ...base(), ...JSON.parse(localStorage.getItem(KEY) || "{}") };
+      } catch {
+        state = base();
+      }
+      let page = "inicio";
+      const $ = (id) => document.getElementById(id);
+      const esc = (x) =>
+        String(x ?? "").replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      function save() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(state));
+        } catch (e) {
+          alert("No fue posible guardar localmente. Exporta un JSON.");
+        }
+      }
+      function set(k, v) {
+        state[k] = v;
+        save();
+      }
+      function nav(p) {
+        page = p;
+        document
+          .querySelectorAll("[data-page]")
+          .forEach((b) => b.classList.toggle("active", b.dataset.page === p));
+        render();
+      }
+      document
+        .querySelectorAll("[data-page]")
+        .forEach((b) => (b.onclick = () => nav(b.dataset.page)));
+      function field(id, label, value = "", type = "text") {
+        return `<label for="${id}">${label}</label>${type === "textarea" ? `<textarea id="${id}">${esc(value)}</textarea>` : `<input id="${id}" type="${type}" value="${esc(value)}">`}`;
+      }
+      function add(k, rec) {
+        state[k].push({ id: Date.now() + Math.random(), ...rec });
+        save();
+        render();
+      }
+      function del(k, id) {
+        state[k] = state[k].filter((x) => x.id !== id);
+        save();
+        render();
+      }
+      function doc(t, body) {
+        return `<details class="doc"><summary>${t}</summary><p>${body}</p></details>`;
+      }
+      const questions = [
+        {
+          q: "¿Cuál es la amenaza en el acceso remoto sospechoso?",
+          options: [
+            "La cuenta que no se dio de baja",
+            "Uso no autorizado de una cuenta para acceder a expedientes",
+            "El expediente digital",
+          ],
+          correct: 1,
+          why: "La amenaza es la acción o evento potencialmente dañino; la cuenta activa es una debilidad que puede facilitarla.",
+        },
+        {
+          q: "¿Qué vulnerabilidad favorece ese acceso?",
+          options: [
+            "Cuenta de proveedor activa tras terminar el contrato y acceso sin MFA",
+            "El usuario necesita consultar expedientes",
+            "La existencia de una base de datos",
+          ],
+          correct: 0,
+          why: "La cuenta no revocada y la falta de MFA son debilidades observables.",
+        },
+        {
+          q: "¿Qué se puede afirmar con el LOG-01?",
+          options: [
+            "Está probado que el proveedor robó datos",
+            "Hay acceso y descarga registrados; la identidad del operador y la exfiltración requieren corroboración",
+            "No ocurrió nada porque no faltan expedientes",
+          ],
+          correct: 1,
+          why: "Un registro puede mostrar actividad, pero no basta para atribuir autoría o demostrar salida efectiva de datos.",
+        },
+        {
+          q: "En el escenario de enero, ¿qué describe mejor el phishing?",
+          options: [
+            "Un respaldo automático",
+            "Un intento de engañar a una persona para obtener credenciales o inducir una acción",
+            "Una falla de electricidad",
+          ],
+          correct: 1,
+          why: "Phishing es ingeniería social; puede iniciar una cadena de ataque, pero no siempre conduce a ransomware.",
+        },
+        {
+          q: "¿Cuál es el impacto más directo del cifrado por ransomware?",
+          options: [
+            "Disponibilidad de expedientes y continuidad del servicio",
+            "Solo estética del sistema",
+            "Ningún impacto si existe un antivirus",
+          ],
+          correct: 0,
+          why: "El cifrado impide el acceso; también podrían afectarse confidencialidad e integridad según el caso.",
+        },
+        {
+          q: "¿Qué acción preserva mejor la evidencia de un incidente?",
+          options: [
+            "Editar el log original para quitar datos repetidos",
+            "Capturar copia controlada, registrar origen/fecha, restringir acceso y verificar integridad",
+            "Enviar los logs completos a un grupo público",
+          ],
+          correct: 1,
+          why: "Se debe preservar el original y documentar trazabilidad, integridad y acceso.",
+        },
+        {
+          q: "¿Qué corresponde hacer con el proveedor externo?",
+          options: [
+            "Ignorarlo porque no es empleado",
+            "Revisar responsabilidades contractuales, accesos, notificación y evidencia",
+            "Dar por hecho que es culpable",
+          ],
+          correct: 1,
+          why: "Los proveedores son dependencias que deben gestionarse conforme a riesgos y acuerdos.",
+        },
+        {
+          q: "¿Cuál sería una conclusión de auditoría técnicamente sustentable?",
+          options: [
+            "La alerta por sí sola demuestra filtración confirmada",
+            "La revisión de permisos vencida puede contrastarse con la política trimestral y sus registros",
+            "El sistema cumple porque tiene contraseñas",
+          ],
+          correct: 1,
+          why: "Una no conformidad requiere criterio, condición y evidencia objetiva.",
+        },
+      ];
+      function render() {
+        let h = "";
+        if (page === "inicio") {
+          let done = [
+            state.auditor,
+            state.riesgos.length,
+            state.evidencias.length,
+            state.hallazgos.length,
+            state.graded,
+            state.conclusion,
+          ].filter(Boolean).length;
+          h = `<h2>Tu misión: auditar un SGSI</h2><span class="tag">AUD-SIM-001 · Caso ficticio</span><p>Investiga la gestión de expedientes digitales de crédito, analiza accesos anómalos y un escenario de phishing y ransomware. Identifica <b>activo, amenaza, vulnerabilidad, riesgo, impacto CID y controles</b>.</p><div class="notice"><b>Regla de auditoría:</b> una sospecha no es una no conformidad. Documenta siempre el criterio aplicable y la evidencia objetiva.</div>${field("auditor", "Nombre del participante", state.auditor)}<label>Avance de práctica: ${Math.round((done / 6) * 100)}%</label><div class="progress"><span style="width:${(done / 6) * 100}%"></span></div><h3>Ruta de trabajo</h3><ol><li>Explora documentos y eventos del caso.</li><li>Estudia las diferencias entre amenaza, vulnerabilidad y riesgo.</li><li>Registra riesgos, evidencias y hallazgos.</li><li>Contesta la autoevaluación con retroalimentación.</li><li>Exporta el informe y respaldo de tu trabajo.</li></ol><div class="actions"><button class="primary" onclick="set('auditor',$('auditor').value);nav('caso')">Guardar y comenzar →</button></div>`;
+        }
+        if (page === "caso")
+          h = `<h2>Expediente del caso</h2><div class="notice"><b>Todo es ficticio.</b></div><h3>Escenario A · Accesos anómalos en noviembre</h3>${doc("POL-01 · Política v1.2", "Aprobada el 15/01/2026. Exige MFA en accesos remotos, revisión trimestral de permisos y reporte de incidentes dentro de 24 horas.")}${doc("PRO-01 · Baja de usuarios", "El área responsable notifica a TI al terminar una relación contractual; TI debe deshabilitar la cuenta en máximo cuatro horas y conservar registro.")}${doc("REG-01 · Cuentas de acceso", "EXT-PROV-07: contrato finalizado el 01/10/2026; cuenta todavía activa el 11/11/2026. Última revisión formal de permisos: 10/06/2026.")}${doc("LOG-01 · Acceso remoto", "11/11/2026 02:17: acceso exitoso de EXT-PROV-07, MFA: NO, origen inusual. 02:19: consulta de 37 expedientes. 02:24: creación de archivo comprimido de 140 MB. No se ha confirmado salida de datos ni autoría.")}${doc("MON-01 · Monitoreo", "Alerta generada 02:20; primer ticket abierto 10:45. La alerta no fue atendida de inmediato.")}${doc("PROV-01 · Acuerdo con proveedor", "Proveedor externo de infraestructura; acuerdo menciona disponibilidad, pero no especifica claramente plazos de aviso de incidentes ni revocación de accesos al terminar contrato.")}${doc("BKP-01 · Respaldos", "Respaldo reportado como exitoso el 10/11/2026. No hay evidencia disponible de pruebas de restauración en los últimos 12 meses.")}${doc("ENT-01 · Declaración de TI", "«Creíamos que el proveedor había cancelado la cuenta. Necesitamos validar firewall y registros adicionales antes de concluir que hubo salida de datos».")}<h3>Escenario B · Enero: phishing y ransomware (simulación)</h3>${doc("ENE-01 · Correo recibido", "Un empleado recibe un correo que aparenta provenir de soporte TI y le pide iniciar sesión en un enlace para «validar su cuenta». El dominio es similar al institucional, pero distinto.")}${doc("ENE-02 · Alerta del equipo", "09:12: se registra ejecución de un archivo descargado desde un enlace recibido por correo. 09:19: el sistema de protección alerta por comportamiento compatible con cifrado masivo de archivos.")}${doc("ENE-03 · Operación afectada", "09:27: varios archivos compartidos no pueden abrirse. Un mensaje exige un pago para recuperarlos. Se interrumpe temporalmente la consulta de expedientes del área simulada.")}${doc("ENE-04 · Respuesta inicial", "10:05: el equipo afectado es aislado de la red. No consta en el expediente una captura inicial de memoria ni el registro de quién obtuvo la primera copia de los logs.")}${doc("ENE-05 · Proveedor de respaldo", "El proveedor reporta copia nocturna disponible, pero no presenta constancia de restauración probada ni detalle del objetivo de recuperación acordado.")}${doc("ENE-06 · Dato aún no probado", "No existe evidencia suficiente para asegurar que el correo fue la causa del ransomware ni que hubo exfiltración. Se requieren correlación temporal, análisis forense y registros adicionales.")}<div class="actions"><button class="primary" onclick="nav('analisis')">Analizar conceptos →</button></div>`;
+        if (page === "analisis")
+          h = `<h2>Identifica: activo, amenaza, vulnerabilidad y riesgo</h2><p>Estas categorías no son sinónimos. Usa la información documental para justificar cada clasificación.</p><div class="grid"><div class="metric"><b>Activo</b><span>Algo de valor: expedientes, cuentas, servicios y procesos.</span></div><div class="metric"><b>Amenaza</b><span>Evento o actor capaz de causar daño: phishing, malware o acceso indebido.</span></div><div class="metric"><b>Vulnerabilidad</b><span>Debilidad explotable: cuenta activa, falta de MFA o software desactualizado.</span></div></div><div class="notice"><b>Riesgo:</b> posibilidad de que una amenaza aproveche una vulnerabilidad y produzca consecuencias sobre un activo. <b>Impacto CID:</b> confidencialidad, integridad y disponibilidad.</div><h3>Ejemplos del caso</h3><table><tr><th>Elemento</th><th>Acceso remoto</th><th>Phishing y ransomware</th></tr><tr><td>Activo</td><td>Expedientes y cuentas</td><td>Archivos y servicio de consulta</td></tr><tr><td>Amenaza</td><td>Acceso no autorizado</td><td>Engaño y cifrado malicioso</td></tr><tr><td>Vulnerabilidad</td><td>Cuenta sin baja y sin MFA</td><td>Posible ejecución de archivo no confiable; causa aún por verificar</td></tr><tr><td>Impacto</td><td>Confidencialidad potencial</td><td>Disponibilidad afectada</td></tr><tr><td>Control sugerido</td><td>Revocación de accesos, MFA, monitoreo</td><td>Concienciación, antimalware, respaldos probados y respuesta a incidentes</td></tr></table><div class="notice warning">El caso de enero no permite afirmar que el phishing causó el ransomware. La correlación debe investigarse antes de concluir.</div><h3>Controles de referencia del Anexo A</h3><p class="small">A.5.15 control de acceso · A.5.17 información de autenticación · A.5.19 relaciones con proveedores · A.5.24 planificación y preparación para incidentes · A.5.28 recopilación de evidencias · A.6.3 concienciación · A.8.5 autenticación segura · A.8.7 protección contra malware · A.8.13 respaldo · A.8.15 registro de eventos · A.8.16 monitoreo.</p><div class="actions"><button class="primary" onclick="nav('riesgos')">Registrar riesgos →</button></div>`;
+        if (page === "riesgos")
+          h = `<h2>Registro de riesgos</h2><p>Describe la relación entre el activo, la amenaza y la vulnerabilidad; evita confundir la amenaza con la consecuencia.</p><form id="riskForm">${field("activo", "Activo afectado")}${field("amenaza", "Amenaza")}${field("vulnerabilidad", "Vulnerabilidad")}${field("impacto", "Impacto CID y consecuencia")}${field("control", "Control propuesto")}<div class="actions"><button class="primary">Agregar riesgo</button></div></form><h3>Riesgos (${state.riesgos.length})</h3>${state.riesgos.map((x) => `<div class="card"><b>${esc(x.activo)}</b><p>Amenaza: ${esc(x.amenaza)}<br>Vulnerabilidad: ${esc(x.vulnerabilidad)}<br>Impacto: ${esc(x.impacto)}<br>Control: ${esc(x.control)}</p><button class="danger" onclick="del('riesgos',${x.id})">Eliminar</button></div>`).join("") || '<p class="muted">Sin registros todavía.</p>'}`;
+        if (page === "evidencias")
+          h = `<h2>Registro y preservación de evidencias</h2><div class="notice">Cita fuentes ficticias (LOG-01, ENE-03, etc.). Esta versión conserva descripciones, <b>no archivos originales ni cadena de custodia formal</b>.</div><form id="evidenceForm">${field("codigo", "Código (ej. EV-01)")}${field("fuente", "Fuente documental (ej. ENE-03)")}${field("descripcion", "Hecho comprobable (sin suposiciones)", "", "textarea")}${field("preservacion", "Cómo preservarías la evidencia", "", "textarea")}<div class="actions"><button class="primary">Guardar evidencia</button></div></form><h3>Evidencias (${state.evidencias.length})</h3>${state.evidencias.map((x) => `<div class="card"><b>${esc(x.codigo)} · ${esc(x.fuente)}</b><p>${esc(x.descripcion)}</p><small>Preservación: ${esc(x.preservacion)}</small><div class="actions"><button class="danger" onclick="del('evidencias',${x.id})">Eliminar</button></div></div>`).join("") || '<p class="muted">Sin registros todavía.</p>'}`;
+        if (page === "hallazgos")
+          h = `<h2>Hallazgos de auditoría</h2><p>Relaciona un criterio aplicable con una condición sustentada por evidencia. Las hipótesis deben quedar identificadas como tales.</p><form id="findingForm">${field("titulo", "Título")}<label for="tipo">Clasificación propuesta</label><select id="tipo"><option>No conformidad</option><option>Observación</option><option>Oportunidad de mejora</option><option>Conformidad</option></select>${field("criterio", "Criterio (norma, política, procedimiento)")}${field("condicion", "Condición verificada", "", "textarea")}${field("referencias", "Referencias documentales")}${field("recomendacion", "Seguimiento sugerido", "", "textarea")}<div class="actions"><button class="primary">Guardar hallazgo</button></div></form><h3>Hallazgos (${state.hallazgos.length})</h3>${state.hallazgos.map((x) => `<div class="card"><span class="pill">${esc(x.tipo)}</span> <b>${esc(x.titulo)}</b><p><b>Criterio:</b> ${esc(x.criterio)}<br><b>Condición:</b> ${esc(x.condicion)}<br><b>Evidencia:</b> ${esc(x.referencias)}<br><b>Seguimiento:</b> ${esc(x.recomendacion)}</p><button class="danger" onclick="del('hallazgos',${x.id})">Eliminar</button></div>`).join("") || '<p class="muted">Sin registros todavía.</p>'}`;
+        if (page === "evaluacion") {
+          let answered = questions.filter(
+            (q, i) => state.answers[i] !== undefined,
+          ).length;
+          let score = questions.filter(
+            (q, i) => state.answers[i] === q.correct,
+          ).length;
+          h = `<h2>Autoevaluación guiada</h2><p>8 preguntas sobre los dos escenarios. Responde primero; al finalizar recibirás la puntuación y explicación de cada respuesta.</p><div class="notice warning">Esta evaluación es <b>formativa</b>: revisa conceptos, no califica automáticamente la calidad de tus hallazgos escritos. Las respuestas están en el código local y no es un examen supervisado.</div><p><b>Respondidas:</b> ${answered}/8</p>${questions.map((q, i) => `<div class="question"><b>${i + 1}. ${esc(q.q)}</b>${q.options.map((o, j) => `<label><input type="radio" name="q${i}" value="${j}" ${state.answers[i] === j ? "checked" : ""} onchange="answer(${i},${j})">${esc(o)}</label>`).join("")}${state.graded ? `<p class="${state.answers[i] === q.correct ? "good" : "bad"}"><b>${state.answers[i] === q.correct ? "✓ Correcto" : "✗ Revisar"}</b> · ${esc(q.why)}</p>` : ""}</div>`).join("")}<div class="actions"><button class="primary" onclick="grade()">Finalizar y evaluar</button><button onclick="state.answers={};state.graded=false;save();render()">Repetir</button></div>${state.graded ? `<div class="notice"><h3>Resultado: ${score}/8 · ${Math.round((score / 8) * 100)}%</h3><p>La calificación orienta tu aprendizaje. Revisa además si tus riesgos, evidencias y hallazgos tienen fundamento.</p></div>` : ""}`;
+        }
+        if (page === "informe")
+          h = `<h2>Informe final</h2><p>Redacta una conclusión prudente: qué se verificó, qué falta investigar y qué acciones priorizarías.</p>${field("conclusion", "Conclusión y acciones prioritarias", state.conclusion, "textarea")}<div class="grid"><div class="metric"><b>${state.riesgos.length}</b><span>Riesgos</span></div><div class="metric"><b>${state.evidencias.length}</b><span>Evidencias</span></div><div class="metric"><b>${state.hallazgos.length}</b><span>Hallazgos</span></div></div><div class="actions"><button class="primary" onclick="set('conclusion',$('conclusion').value);preparePrint();window.print()">🖨 Guardar informe PDF</button><button onclick="set('conclusion',$('conclusion').value);exportJSON()">⬇ Exportar JSON</button><button class="danger" onclick="if(confirm('¿Eliminar el avance guardado en este navegador?')){state=base();save();nav('inicio')}">Reiniciar</button></div><div class="notice">Los datos se guardan solo en el navegador actual. Para entregarlos, exporta el PDF o JSON. No subas información institucional real.</div>`;
+        $("workspace").innerHTML = h;
+        let f = $("riskForm");
+        if (f)
+          f.onsubmit = (e) => {
+            e.preventDefault();
+            add("riesgos", {
+              activo: $("activo").value,
+              amenaza: $("amenaza").value,
+              vulnerabilidad: $("vulnerabilidad").value,
+              impacto: $("impacto").value,
+              control: $("control").value,
+            });
+          };
+        f = $("evidenceForm");
+        if (f)
+          f.onsubmit = (e) => {
+            e.preventDefault();
+            add("evidencias", {
+              codigo: $("codigo").value,
+              fuente: $("fuente").value,
+              descripcion: $("descripcion").value,
+              preservacion: $("preservacion").value,
+            });
+          };
+        f = $("findingForm");
+        if (f)
+          f.onsubmit = (e) => {
+            e.preventDefault();
+            add("hallazgos", {
+              titulo: $("titulo").value,
+              tipo: $("tipo").value,
+              criterio: $("criterio").value,
+              condicion: $("condicion").value,
+              referencias: $("referencias").value,
+              recomendacion: $("recomendacion").value,
+            });
+          };
+      }
+      function answer(i, j) {
+        state.answers[i] = j;
+        state.graded = false;
+        save();
+      }
+      function grade() {
+        if (questions.some((q, i) => state.answers[i] === undefined)) {
+          alert("Responde las ocho preguntas antes de evaluar.");
+          return;
+        }
+        state.graded = true;
+        save();
+        render();
+      }
+      function preparePrint() {
+        let section = (title, arr, fn) =>
+          `<h2>${title}</h2>${arr.map(fn).join("") || "<p>Sin registros.</p>"}`;
+        let score = questions.filter(
+          (q, i) => state.answers[i] === q.correct,
+        ).length;
+        $("printReport").innerHTML =
+          `<h1>SGSI LAB · Informe de auditoría simulada</h1><p><b>Participante:</b> ${esc(state.auditor) || "Sin nombre"} · <b>Fecha:</b> ${esc(state.fecha)}</p><p><b>Alcance:</b> expedientes digitales de crédito (escenario ficticio). <b>Criterios:</b> documentos simulados y requisitos pertinentes de ISO/IEC 27001:2022.</p>${section("Riesgos", state.riesgos, (x) => `<div class="card"><b>${esc(x.activo)}</b><p>Amenaza: ${esc(x.amenaza)}. Vulnerabilidad: ${esc(x.vulnerabilidad)}. Impacto: ${esc(x.impacto)}. Control: ${esc(x.control)}</p></div>`)}${section("Evidencias", state.evidencias, (x) => `<div class="card"><b>${esc(x.codigo)} (${esc(x.fuente)})</b><p>${esc(x.descripcion)}. Preservación: ${esc(x.preservacion)}</p></div>`)}${section("Hallazgos", state.hallazgos, (x) => `<div class="card"><b>${esc(x.tipo)} · ${esc(x.titulo)}</b><p>Criterio: ${esc(x.criterio)}<br>Condición: ${esc(x.condicion)}<br>Evidencia: ${esc(x.referencias)}<br>Seguimiento: ${esc(x.recomendacion)}</p></div>`)}<h2>Conclusiones</h2><p>${esc(state.conclusion)}</p><h2>Autoevaluación</h2><p>${state.graded ? `${score}/8 (${Math.round((score / 8) * 100)}%) · orientativa` : "No realizada"}</p><hr><small>Simulación educativa con datos ficticios. No constituye auditoría oficial, certificación ni cadena de custodia formal.</small>`;
+      }
+      function exportJSON() {
+        let blob = new Blob(
+          [
+            JSON.stringify(
+              { laboratorio: "SGSI LAB", caso: "AUD-SIM-001", ...state },
+              null,
+              2,
+            ),
+          ],
+          { type: "application/json" },
+        );
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "sgsi-lab-auditoria.json";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      }
+      render();
+    </script>
+  </body>
+</html>
